@@ -1,0 +1,45 @@
+name: my_app
+description: A new Flutter project.
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # FIREBASE - COMPATIBLE VERSIONS
+  firebase_core: ^2.24.2      # Stable version for most Flutter versions
+  firebase_auth: ^4.16.0      # Compatible with firebase_core 2.x
+  cloud_firestore: ^4.14.0    # Compatible version
+  
+  # LOCAL STORAGE
+  shared_preferences: ^2.2.2  # Most compatible version
+  
+  # GOOGLE SIGN IN
+  google_sign_in: ^6.1.5      # Stable version
+  
+  # UI & Utils
+  flutter_native_splash: ^2.4.6
+  intl: ^0.18.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/splash_logo.png
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/images/splash_logo.png
+  android: true
+  ios: true
