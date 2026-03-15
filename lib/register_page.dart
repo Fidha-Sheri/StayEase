@@ -10,8 +10,6 @@ class RegisterPage extends StatefulWidget {
   State<RegisterPage> createState() => _RegisterPageState();
 }
 
-
-
 class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
@@ -23,9 +21,9 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
 
-  // 🔑 ROLE SELECTION
   String selectedRole = 'student';
 
+  /// 🔥 FIREBASE REGISTER FUNCTION
   Future<void> handleRegister() async {
     final name = nameController.text.trim();
     final email = emailController.text.trim();
@@ -48,33 +46,43 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _isLoading = true);
 
     try {
-      // 1️⃣ Create Firebase Auth user
+      /// 1️⃣ Create user in Firebase Authentication
       UserCredential userCredential =
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      final uid = userCredential.user!.uid;
-
-      // 2️⃣ Save user data to Firestore (AUTO collection create)
-      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+      /// 2️⃣ Store user data in Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .set({
         'name': name,
         'email': email,
-        'role': selectedRole, // 🔥 ROLE FROM DROPDOWN
+        'role': selectedRole,
         'createdAt': Timestamp.now(),
       });
 
+      setState(() => _isLoading = false);
+
       _showSnackBar('Registration Successful');
 
-      // 3️⃣ Go to Login
+      /// 3️⃣ Navigate to Login page
       Navigator.pushReplacementNamed(context, AppRoutes.login);
     } on FirebaseAuthException catch (e) {
-      _showSnackBar(e.message ?? 'Registration failed');
-    } catch (e) {
-      _showSnackBar('Something went wrong');
-    } finally {
       setState(() => _isLoading = false);
+
+      if (e.code == 'email-already-in-use') {
+        _showSnackBar('Email already registered');
+      } else if (e.code == 'weak-password') {
+        _showSnackBar('Password is too weak');
+      } else {
+        _showSnackBar(e.message ?? 'Registration failed');
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showSnackBar('Something went wrong');
     }
   }
 
@@ -154,14 +162,12 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 const SizedBox(height: 24),
 
-                // NAME
                 TextField(
                   controller: nameController,
                   decoration: _inputDecoration('Full Name'),
                 ),
                 const SizedBox(height: 14),
 
-                // EMAIL
                 TextField(
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -169,7 +175,6 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 const SizedBox(height: 14),
 
-                // PASSWORD
                 TextField(
                   controller: passwordController,
                   obscureText: _obscurePassword,
@@ -189,7 +194,6 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 const SizedBox(height: 14),
 
-                // CONFIRM PASSWORD
                 TextField(
                   controller: confirmPasswordController,
                   obscureText: _obscureConfirmPassword,
@@ -203,29 +207,20 @@ class _RegisterPageState extends State<RegisterPage> {
                         color: Colors.grey,
                       ),
                       onPressed: () => setState(() =>
-                          _obscureConfirmPassword = !_obscureConfirmPassword),
+                          _obscureConfirmPassword =
+                              !_obscureConfirmPassword),
                     ),
                   ),
                 ),
                 const SizedBox(height: 14),
 
-                // 🔥 ROLE DROPDOWN
                 DropdownButtonFormField<String>(
                   value: selectedRole,
                   decoration: _inputDecoration('Select Role'),
                   items: const [
-                    DropdownMenuItem(
-                      value: 'student',
-                      child: Text('Student'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'warden',
-                      child: Text('Warden'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'admin',
-                      child: Text('Admin'),
-                    ),
+                    DropdownMenuItem(value: 'student', child: Text('Student')),
+                    DropdownMenuItem(value: 'warden', child: Text('Warden')),
+                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
                   ],
                   onChanged: (value) {
                     setState(() {
@@ -236,7 +231,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
                 const SizedBox(height: 22),
 
-                // REGISTER BUTTON
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../admin_home.dart';
 import 'profile_page.dart';
 
@@ -10,97 +11,112 @@ class StudentManagementPage extends StatefulWidget {
 }
 
 class _StudentManagementPageState extends State<StudentManagementPage> {
-  List<Map<String, dynamic>> students = [
-    {"name": "Alice", "email": "alice@gmail.com", "gender": "Female"},
-    {"name": "Bob", "email": "bob@gmail.com", "gender": "Male"},
-    {"name": "Charlie", "email": "charlie@gmail.com", "gender": "Male"},
-    {"name": "Debbie", "email": "debbie@example.com", "gender": "Female"},
-  ];
 
-  int _selectedIndex = 1; // 0 = Home, 1 = Students, 2 = Profile
+  int _selectedIndex = 1;
 
-  void _onNavTap(int index) {
-    if (index == _selectedIndex) return;
+  void _onNavTap(int index){
 
-    if (index == 0) {
+    if(index==0){
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const AdminHome()),
       );
-    } else if (index == 2) {
+    }
+
+    if(index==2){
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const ProfilePage()),
       );
     }
-
-    setState(() => _selectedIndex = index);
   }
 
   @override
   Widget build(BuildContext context) {
+
     final primaryColor = Theme.of(context).primaryColor;
 
     return Scaffold(
+
       appBar: AppBar(
         title: const Text("Student Management"),
         centerTitle: true,
         backgroundColor: primaryColor,
       ),
-      body: SingleChildScrollView(
-        scrollDirection: Axis.vertical,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columnSpacing: 30,
-            headingRowHeight: 40,
-            dataRowHeight: 45,
-            headingTextStyle: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: primaryColor,
-            ),
-            dataTextStyle: const TextStyle(fontSize: 14),
-            columns: const [
-              DataColumn(label: Text('Name')),
-              DataColumn(label: Text('Email')),
-              DataColumn(label: Text('Gender')),
-              DataColumn(label: SizedBox()), // Delete column
-            ],
-            rows: students.asMap().entries.map((entry) {
-              int index = entry.key;
-              Map<String, dynamic> student = entry.value;
 
-              return DataRow(
-                cells: [
-                  DataCell(Text(student["name"])),
-                  DataCell(Text(student["email"])),
-                  DataCell(Text(student["gender"])),
-                  DataCell(
-                    IconButton(
-                      icon: Icon(Icons.delete, color: primaryColor, size: 24),
-                      onPressed: () {
-                        setState(() {
-                          students.removeAt(index);
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
-          ),
-        ),
+      body: StreamBuilder(
+
+        stream: FirebaseFirestore.instance
+            .collection("users")
+            .where("role", isEqualTo: "student")
+            .snapshots(),
+
+        builder: (context, snapshot){
+
+          if(!snapshot.hasData){
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          var students = snapshot.data!.docs;
+
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+
+              columns: const [
+
+                DataColumn(label: Text("Name")),
+                DataColumn(label: Text("Email")),
+                DataColumn(label: Text("Delete")),
+
+              ],
+
+              rows: students.map((doc){
+
+                return DataRow(
+
+                  cells: [
+
+                    DataCell(Text(doc['name'])),
+
+                    DataCell(Text(doc['email'])),
+
+                    DataCell(
+
+                      IconButton(
+
+                        icon: const Icon(Icons.delete,color: Colors.red),
+
+                        onPressed: (){
+
+                          FirebaseFirestore.instance
+                              .collection("users")
+                              .doc(doc.id)
+                              .delete();
+
+                        },
+                      ),
+
+                    )
+
+                  ],
+                );
+
+              }).toList(),
+            ),
+          );
+
+        },
       ),
+
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onNavTap,
-        selectedItemColor: primaryColor,
-        unselectedItemColor: Colors.grey,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.group), label: "Students"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+
+          BottomNavigationBarItem(icon: Icon(Icons.home),label: "Home"),
+          BottomNavigationBarItem(icon: Icon(Icons.group),label: "Students"),
+         
         ],
       ),
     );

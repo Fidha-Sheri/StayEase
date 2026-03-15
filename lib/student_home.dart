@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:my_app/wardenscreens/events_page.dart';
 
 import 'studentscreens/mess_menu_page.dart';
 import 'studentscreens/apply_leave_page.dart';
 import 'studentscreens/complaints_page.dart';
-import 'studentscreens/fee_status_page.dart';
 import 'studentscreens/events_page.dart';
 import 'studentscreens/profile_page.dart';
 import 'studentscreens/feedback_page.dart';
@@ -36,7 +37,7 @@ class _StudentHomeState extends State<StudentHome> {
         appBar: AppBar(
           title: const Text('Welcome'),
           centerTitle: true,
-          backgroundColor: const Color.fromARGB(255, 71, 195, 225),
+          backgroundColor:  Colors.blue[800],
           elevation: 0,
           automaticallyImplyLeading: false,
         ),
@@ -44,7 +45,8 @@ class _StudentHomeState extends State<StudentHome> {
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
-          selectedItemColor: const Color(0xFF1E88E5),
+          backgroundColor: Colors.blue[800],
+          selectedItemColor: Colors.white,
           unselectedItemColor: Colors.grey,
           items: const [
             BottomNavigationBarItem(
@@ -63,6 +65,8 @@ class _StudentHomeState extends State<StudentHome> {
 
   // ---------------- DASHBOARD ----------------
   Widget _dashboard() {
+    final userEmail = FirebaseAuth.instance.currentUser?.email ?? "student@gmail.com";
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: GridView.count(
@@ -75,14 +79,14 @@ class _StudentHomeState extends State<StudentHome> {
             title: 'Mess Menu',
             color1: const Color(0xFF90CAF9),
             color2: const Color(0xFF1E88E5),
-            page: const MessMenuPage(),
+            page: const StudentMessMenuPage(),
           ),
           _card(
             icon: Icons.note_add,
             title: 'Apply Leave',
             color1: const Color(0xFF81D4FA),
             color2: const Color(0xFF039BE5),
-            page: const ApplyLeavePage(),
+            page: ApplyLeavePage(studentEmail: userEmail), // ⚡ Updated
           ),
           _card(
             icon: Icons.report_problem,
@@ -91,19 +95,13 @@ class _StudentHomeState extends State<StudentHome> {
             color2: const Color(0xFF00897B),
             page: const ComplaintsPage(),
           ),
-          _card(
-            icon: Icons.account_balance_wallet,
-            title: 'Fee Status',
-            color1: const Color(0xFF9FA8DA),
-            color2: const Color(0xFF3F51B5),
-            page: const FeeStatusPage(),
-          ),
+      
           _card(
             icon: Icons.event,
             title: 'Events',
             color1: const Color(0xFF64B5F6),
             color2: const Color(0xFF1565C0),
-            page: const EventsPage(),
+            page: const StudentEventsPage(),
           ),
           _card(
             icon: Icons.feedback,

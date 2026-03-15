@@ -94,7 +94,7 @@ class _WardenHomeState extends State<WardenHome> {
           _buildDashboardCard(
             Icons.event_note,
             "Leave Approval",
-            Colors.indigo.shade600,
+            const Color.fromARGB(255, 127, 142, 242),
             onTap: () {
               Navigator.push(
                 context,
@@ -107,7 +107,7 @@ class _WardenHomeState extends State<WardenHome> {
           _buildDashboardCard(
             Icons.report_problem,
             "Complaints",
-            Colors.redAccent.shade400,
+            const Color.fromARGB(255, 240, 111, 122),
             onTap: () {
               Navigator.push(
                 context,
@@ -125,15 +125,15 @@ class _WardenHomeState extends State<WardenHome> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const MessMenuPage(),
+                  builder: (context) => const WardenMessMenuPage(),
                 ),
               );
             },
           ),
           _buildDashboardCard(
             Icons.event,
-            "Events / Notices",
-            Colors.purple.shade600,
+            "Events",
+            const Color.fromARGB(255, 212, 103, 242),
             onTap: () {
               Navigator.push(
                 context,
@@ -146,7 +146,7 @@ class _WardenHomeState extends State<WardenHome> {
           _buildDashboardCard(
             Icons.feedback,
             "View Feedback",
-            Colors.orange.shade600,
+            const Color.fromARGB(255, 245, 172, 83),
             onTap: () {
               Navigator.push(
                 context,

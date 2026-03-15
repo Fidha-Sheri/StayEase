@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
-import '../student_home.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../app_routes.dart'; // make sure your routes are defined here
 
-class MessMenuPage extends StatefulWidget {
-  const MessMenuPage({super.key});
+class StudentMessMenuPage extends StatefulWidget {
+  const StudentMessMenuPage({super.key});
 
   @override
-  State<MessMenuPage> createState() => _MessMenuPageState();
+  State<StudentMessMenuPage> createState() => _StudentMessMenuPageState();
 }
 
-class _MessMenuPageState extends State<MessMenuPage> {
+class _StudentMessMenuPageState extends State<StudentMessMenuPage> {
   bool _loading = false;
+  List<Map<String, dynamic>> _weeklyMenu = [];
+  int _selectedIndex = 1; // 0 = Home, 1 = Mess Menu
 
   final List<String> weekdays = [
     "Monday",
@@ -21,49 +24,29 @@ class _MessMenuPageState extends State<MessMenuPage> {
     "Sunday"
   ];
 
-  late final List<Map<String, dynamic>> _weeklyMenu;
-
-  int _selectedIndex = 1; // Mess Menu selected
-
   @override
   void initState() {
     super.initState();
-    _weeklyMenu = weekdays.map((day) {
-      return {
-        'day': day,
-        'meals': [
-          {
-            'type': 'Breakfast',
-            'items': ['Idli', 'Sambar', 'Chutney']
-          },
-          {
-            'type': 'Lunch',
-            'items': ['Rice', 'Chicken Curry', 'Vegetables']
-          },
-          {
-            'type': 'Dinner',
-            'items': ['Chapati', 'Paneer Butter Masala', 'Salad']
-          },
-        ]
-      };
-    }).toList();
+    fetchMenu();
   }
 
-  Future<void> fetchMenuFromApi() async {
+  Future<void> fetchMenu() async {
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 700));
-    setState(() => _loading = false);
-  }
+    final collection = FirebaseFirestore.instance.collection('mess_menu');
 
-  void _onNavBarTap(int index) {
-    if (index == _selectedIndex) return;
-
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const StudentHome()),
-      );
+    try {
+      final snapshot = await collection.get();
+      _weeklyMenu = snapshot.docs.map((doc) {
+        return {
+          'day': doc['day'],
+          'meals': List<Map<String, dynamic>>.from(doc['meals']),
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint("Error fetching menu: $e");
     }
+
+    setState(() => _loading = false);
   }
 
   Widget mealCard(Map<String, dynamic> meal) {
@@ -101,10 +84,8 @@ class _MessMenuPageState extends State<MessMenuPage> {
         children: [
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(8),
-            ),
+            decoration:
+                BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
             child: Icon(icon, size: 28),
           ),
           const SizedBox(width: 12),
@@ -112,16 +93,12 @@ class _MessMenuPageState extends State<MessMenuPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  meal['type'],
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 18),
-                ),
+                Text(meal['type'],
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(
-                  (meal['items'] as List).join(', '),
-                  style: const TextStyle(fontSize: 16),
-                ),
+                Text((meal['items'] as List).join(', '),
+                    style: const TextStyle(fontSize: 16)),
               ],
             ),
           ),
@@ -133,19 +110,17 @@ class _MessMenuPageState extends State<MessMenuPage> {
   Widget dayCard(Map<String, dynamic> day) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              day['day'],
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
+            Text(day['day'],
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            ...day['meals'].map<Widget>(mealCard).toList(),
+            ...day['meals'].map<Widget>((meal) => mealCard(meal)).toList(),
           ],
         ),
       ),
@@ -158,36 +133,35 @@ class _MessMenuPageState extends State<MessMenuPage> {
       appBar: AppBar(
         title: const Text('Mess Menu'),
         centerTitle: true,
-        backgroundColor: Colors.blue.shade700,
+        backgroundColor: Colors.blue[800],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: fetchMenuFromApi,
+              onRefresh: fetchMenu,
               child: ListView.builder(
                 padding: const EdgeInsets.all(12),
                 itemCount: _weeklyMenu.length,
-                itemBuilder: (context, index) {
-                  return dayCard(_weeklyMenu[index]);
-                },
+                itemBuilder: (context, index) => dayCard(_weeklyMenu[index]),
               ),
             ),
-
-      // 🔽 Bottom Navigation (ONLY 2 ITEMS)
+      // -------- BOTTOM NAVIGATION --------
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: _onNavBarTap,
-        selectedItemColor: Colors.blue.shade700,
-        unselectedItemColor: Colors.grey,
+        backgroundColor: Colors.blue[800],
+        selectedItemColor: const Color.fromARGB(255, 244, 245, 248),
+        unselectedItemColor: Colors.white70,
+        onTap: (index) {
+          setState(() => _selectedIndex = index);
+
+          if (index == 0) {
+            Navigator.pushReplacementNamed(context, AppRoutes.homeStudent);
+          }
+        },
         items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.restaurant_menu),
-            label: 'Mess Menu',
-          ),
+              icon: Icon(Icons.restaurant_menu), label: "Mess Menu"),
         ],
       ),
     );

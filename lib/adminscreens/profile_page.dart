@@ -1,109 +1,113 @@
 import 'package:flutter/material.dart';
-import '../admin_home.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final Map<String, String> admin = {
-      'name': 'Admin Name',
-      'email': 'admin@example.com',
-      'phone': '+91-9876543210',
-    };
+  State<ProfilePage> createState() => _ProfilePageState();
+}
 
-    final primaryColor = Theme.of(context).primaryColor;
+class _ProfilePageState extends State<ProfilePage> {
+  final User? user = FirebaseAuth.instance.currentUser;
+
+  Map<String, dynamic>? userData;
+
+  @override
+  void initState() {
+    super.initState();
+    getUserData();
+  }
+
+  /// GET ADMIN DATA
+  Future<void> getUserData() async {
+    final doc = await FirebaseFirestore.instance
+        .collection("users")
+        .doc(user!.uid)
+        .get();
+
+    setState(() {
+      userData = doc.data();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    String name = userData?['name'] ?? "Loading...";
+    String email = user?.email ?? "";
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        centerTitle: true,
-        backgroundColor: primaryColor,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      backgroundColor: Colors.grey[100],
+      body: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
           children: [
+            const SizedBox(height: 30),
+
+            /// PROFILE AVATAR
             CircleAvatar(
               radius: 50,
-              backgroundColor: Colors.blue.shade300,
+              backgroundColor: Colors.blue,
               child: Text(
-                admin['name']!.substring(0, 1).toUpperCase(),
-                style: const TextStyle(fontSize: 40, color: Colors.white),
+                name != "Loading..." ? name[0].toUpperCase() : "A",
+                style: const TextStyle(
+                  fontSize: 40,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              admin['name']!,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
+
+            const SizedBox(height: 25),
+
+            /// PROFILE CARD
             Card(
               elevation: 3,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              child: ListTile(
-                leading: const Icon(Icons.email, color: Colors.blue),
-                title: Text(admin['email']!),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.person, color: Colors.blue),
+                    title: const Text("Full Name"),
+                    subtitle: Text(name),
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: const Icon(Icons.email, color: Colors.blue),
+                    title: const Text("Email"),
+                    subtitle: Text(email),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Card(
-              elevation: 3,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              child: ListTile(
-                leading: const Icon(Icons.phone, color: Colors.blue),
-                title: Text(admin['phone']!),
+
+            const Spacer(),
+
+            /// LOGOUT BUTTON
+            SizedBox( 
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  await FirebaseAuth.instance.signOut();
+
+                  Navigator.pushReplacementNamed(context, "/login");
+                },
+                icon: const Icon(Icons.logout),
+                label: const Text("Logout"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color.fromARGB(255, 242, 121, 91),
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 30),
-            ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Edit profile (stub)')));
-              },
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  minimumSize: const Size(double.infinity, 48)),
-              icon: const Icon(Icons.edit),
-              label: const Text("Edit Profile"),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.pushReplacementNamed(context, '/login');
-              },
-              style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  minimumSize: const Size(double.infinity, 48)),
-              icon: const Icon(Icons.logout),
-              label: const Text("Logout"),
-            ),
+            )
           ],
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 1, // 0 = Home, 1 = Profile
-        onTap: (index) {
-          if (index == 0) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminHome()),
-            );
-          }
-        },
-        selectedItemColor: primaryColor,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-        ],
       ),
     );
   }

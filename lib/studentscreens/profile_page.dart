@@ -1,168 +1,117 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../app_routes.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
-  final Map<String, String> user = const {
-    'name': 'Fidha',
-    'email': 'fidha053@gmail.com',
-    'phone': '+91-8113876163',
-  };
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
 
-  Widget _infoTile(IconData icon, String value) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blue.withOpacity(0.12),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: const Color(0xFFE3F2FD),
-            child: Icon(icon, color: const Color(0xFF1E88E5)),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+class _ProfilePageState extends State<ProfilePage> {
+  final User? user = FirebaseAuth.instance.currentUser;
+
+  Map<String, dynamic>? userData;
+
+  @override
+  void initState() {
+    super.initState();
+    getUserData();
+  }
+
+  /// FETCH USER DATA FROM FIRESTORE
+  Future<void> getUserData() async {
+    final doc = await FirebaseFirestore.instance
+        .collection("users")
+        .doc(user!.uid)
+        .get();
+
+    setState(() {
+      userData = doc.data();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    String name = userData?['name'] ?? "Loading...";
+    String email = userData?['email'] ?? "";
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F9FF),
+      backgroundColor: Colors.grey[200],
 
-      // ✅ APP BAR WITH BACK ARROW
-      appBar: AppBar(
-        automaticallyImplyLeading: true, // back arrow show
-        backgroundColor: const Color.fromARGB(255, 71, 195, 225),
-        elevation: 0,
-        centerTitle: true,
-        title: const Text('Profile'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context); // ✅ go back to Student Dashboard
-          },
-        ),
-      ),
-
-      body: SingleChildScrollView(
+      /// BODY
+      body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // PROFILE HEADER
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 26),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E88E5),
-                borderRadius: BorderRadius.circular(26),
+            const SizedBox(height: 30),
+
+            /// PROFILE ICON
+            CircleAvatar(
+              radius: 45,
+              backgroundColor: Colors.blue,
+              child: Text(
+                name.isNotEmpty ? name[0].toUpperCase() : "U",
+                style: const TextStyle(
+                  fontSize: 35,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            /// DETAILS CARD
+            Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
               ),
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 48,
-                    backgroundColor: Colors.white,
-                    child: Text(
-                      user['name']![0].toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E88E5),
-                      ),
-                    ),
+                  ListTile(
+                    leading: const Icon(Icons.person, color: Colors.blue),
+                    title: const Text("Full Name"),
+                    subtitle: Text(name),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    user['name']!,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                  const Divider(),
+                  ListTile(
+                    leading: const Icon(Icons.email, color: Colors.blue),
+                    title: const Text("Email"),
+                    subtitle: Text(email),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 30),
+            const Spacer(),
 
-            // DETAILS
-            _infoTile(Icons.email, user['email']!),
-            _infoTile(Icons.phone, user['phone']!),
-
-            const SizedBox(height: 30),
-
-            // EDIT PROFILE
+            /// LOGOUT BUTTON
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Edit profile coming soon'),
-                    ),
+                onPressed: () async {
+                  await FirebaseAuth.instance.signOut();
+
+                  Navigator.pushReplacementNamed(
+                    context,
+                    AppRoutes.login,
                   );
                 },
-                icon: const Icon(Icons.edit),
-                label: const Text(
-                  'Edit Profile',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1E88E5),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
-            // LOGOUT
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pushReplacementNamed(context, '/login');
-                },
                 icon: const Icon(Icons.logout),
-                label: const Text(
-                  'Logout',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                label: const Text("Logout"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color.fromARGB(255, 242, 121, 91),
+                  minimumSize: const Size(double.infinity, 55),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(22),
+                    borderRadius: BorderRadius.circular(15),
                   ),
                 ),
               ),
-            ),
+            )
           ],
         ),
       ),

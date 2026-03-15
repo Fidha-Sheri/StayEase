@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../warden_home.dart'; // ✅ Import WardenHome
-import 'profile_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../warden_home.dart';
 
 class ComplaintsPage extends StatefulWidget {
   const ComplaintsPage({super.key});
@@ -10,152 +10,143 @@ class ComplaintsPage extends StatefulWidget {
 }
 
 class _ComplaintsPageState extends State<ComplaintsPage> {
-  int _selectedIndex = 1; // 0 = Home, 1 = Complaints, 2 = Profile
+  int _selectedIndex = 1;
 
-  // Complaints data
-  final List<Map<String, dynamic>> _complaints = [
-    {
-      "student": "Alice Johnson",
-      "complaint": "Leaking faucet in room 101",
-      "date": "2025-10-01",
-      "resolved": false
-    },
-    {
-      "student": "Bob Smith",
-      "complaint": "Mess food quality issue",
-      "date": "2025-10-03",
-      "resolved": false
-    },
-  ];
+  Future<void> _markAsSolved(String docId) async {
+    await FirebaseFirestore.instance
+        .collection('complaints')
+        .doc(docId)
+        .update({'resolved': true});
+  }
 
-  // Handle bottom navigation taps
-  void _onNavBarTap(int index) {
-    if (index == _selectedIndex) return;
+  Color _statusColor(bool resolved) {
+    return resolved ? Colors.green : Colors.red;
+  }
 
-    switch (index) {
-      case 0:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const WardenHome()),
-        );
-        break;
-      case 1:
-        // Already on ComplaintsPage → do nothing
-        break;
-      case 2:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const ProfilePage()),
-        );
-        break;
-    }
+  Widget _buildColumnHeader(String title, double width) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.blue[200],
+        border: Border.all(color: Colors.blue, width: 0.5),
+      ),
+      child: Text(
+        title,
+        style: const TextStyle(
+            fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+      ),
+    );
+  }
+
+  Widget _buildCell(String text, double width,
+      {Color? bgColor, TextAlign align = TextAlign.left}) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+      decoration: BoxDecoration(
+        color: bgColor ?? Colors.white,
+        border: Border.all(color: Colors.grey.shade300, width: 0.5),
+      ),
+      child: Text(
+        text,
+        textAlign: align,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 13),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text("Student Complaints"),
+        title: const Text(
+          "Student Complaints",
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         backgroundColor: Colors.blue[800],
       ),
-      body: _complaints.isEmpty
-          ? const Center(
-              child: Text(
-                "No complaints available.",
-                style: TextStyle(fontSize: 18, color: Colors.grey),
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _complaints.length,
-              itemBuilder: (context, index) {
-                final complaint = _complaints[index];
-                return Card(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  elevation: 5,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  shadowColor: Colors.grey.withOpacity(0.3),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          complaint["student"],
-                          style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          complaint["complaint"],
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.date_range, size: 16),
-                            const SizedBox(width: 4),
-                            Text("Date: ${complaint["date"]}"),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.info_outline, size: 16),
-                            const SizedBox(width: 4),
-                            Text(
-                              "Status: ${complaint["resolved"] ? "Corrected" : "Not Corrected"}",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: complaint["resolved"]
-                                    ? Colors.green
-                                    : Colors.red,
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('complaints')
+            .orderBy('created_at', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          if (snapshot.data!.docs.isEmpty) return const Center(child: Text("No complaints"));
+
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    _buildColumnHeader("Student Email", 200),
+                    _buildColumnHeader("Title", 150),
+                    _buildColumnHeader("Complaint", 300),
+                    _buildColumnHeader("Status", 120),
+                    _buildColumnHeader("Action", 180),
+                  ],
+                ),
+                ...snapshot.data!.docs.map((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final email = data['studentEmail'] ?? 'No email';
+                  final title = data['title'] ?? '';
+                  final complaint = data['complaint'] ?? '';
+                  final resolved = data['resolved'] ?? false;
+
+                  return Row(
+                    children: [
+                      _buildCell(email, 200),
+                      _buildCell(title, 150),
+                      _buildCell(complaint, 300),
+                      _buildCell(
+                        resolved ? "Solved" : "Unsolved",
+                        120,
+                        bgColor: _statusColor(resolved).withOpacity(0.2),
+                        align: TextAlign.center,
+                      ),
+                      Container(
+                        width: 180,
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                        child: resolved
+                            ? const Center(child: Text("-"))
+                            : ElevatedButton(
+                                onPressed: () => _markAsSolved(doc.id),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  padding: const EdgeInsets.symmetric(vertical: 6),
+                                  textStyle: const TextStyle(fontSize: 12),
+                                ),
+                                child: const Text("Mark Solved"),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: complaint["resolved"]
-                                  ? null
-                                  : () {
-                                      setState(() {
-                                        complaint["resolved"] = true;
-                                      });
-                                    },
-                              icon: const Icon(Icons.check),
-                              label: const Text("Mark Corrected"),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 12),
-                                textStyle: const TextStyle(
-                                    fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ],
             ),
+          );
+        },
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: _onNavBarTap,
-        selectedItemColor: Colors.blue.shade700,
-        unselectedItemColor: Colors.grey,
+        onTap: (index) {
+          setState(() => _selectedIndex = index);
+          if (index == 0) {
+            Navigator.pushReplacement(
+                context, MaterialPageRoute(builder: (_) => const WardenHome()));
+          }
+        },
+        backgroundColor: Colors.blue[800],
+        selectedItemColor: const Color.fromARGB(255, 253, 253, 253),
+        unselectedItemColor: Colors.white60,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.report), label: 'Complaints'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+          BottomNavigationBarItem(icon: Icon(Icons.report), label: "Complaints"),
         ],
       ),
     );

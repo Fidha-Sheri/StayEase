@@ -1,124 +1,145 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../app_routes.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  State<ProfilePage> createState() => _WardenProfilePageState();
+  State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _WardenProfilePageState extends State<ProfilePage> {
-  int _selectedIndex = 1; // Profile tab is active
+class _ProfilePageState extends State<ProfilePage> {
+
+  int _selectedIndex = 1;
+
+  final User? user = FirebaseAuth.instance.currentUser;
+
+  Map<String, dynamic>? userData;
+
+  @override
+  void initState() {
+    super.initState();
+    getUserData();
+  }
+
+  /// GET USER DATA FROM FIRESTORE
+  Future<void> getUserData() async {
+
+    final doc = await FirebaseFirestore.instance
+        .collection("users")
+        .doc(user!.uid)
+        .get();
+
+    setState(() {
+      userData = doc.data();
+    });
+  }
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    setState(() => _selectedIndex = index);
 
     if (index == 0) {
-      // Navigate back to Warden Home
-      Navigator.pushReplacementNamed(context, AppRoutes.homeWarden);
+      Navigator.pushReplacementNamed(context, AppRoutes.homeStudent);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Mock warden data
-    final Map<String, String> warden = {
-      'name': 'Fidha Sheri',
-      'email': 'fidha053@gmail.com',
-      'phone': '+91-8113876163',
-      'hostel': 'Farook College Hostel'
-    };
+
+    /// CHANGE HERE (fullname -> name)
+    String fullname = userData?['name'] ?? "Loading...";
+    String email = user?.email ?? "";
 
     return Scaffold(
+      backgroundColor: Colors.grey[100],
+
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text(
-          "Welcome",
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-        ),
+        title: const Text("My Profile"),
         centerTitle: true,
         backgroundColor: Colors.blue[800],
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              const SizedBox(height: 20),
-              CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.blue.shade300,
-                child: Text(
-                  warden['name']!.substring(0, 1).toUpperCase(),
-                  style: const TextStyle(fontSize: 40, color: Colors.white),
+
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+
+            const SizedBox(height: 30),
+
+            /// PROFILE ICON
+            CircleAvatar(
+              radius: 50,
+              backgroundColor: Colors.blue,
+              child: Text(
+                fullname != "Loading..." ? fullname[0].toUpperCase() : "U",
+                style: const TextStyle(
+                  fontSize: 40,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                warden['name']!,
-                style:
-                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+
+            
+
+            /// DETAILS CARD
+            Card(
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
               ),
-              const SizedBox(height: 8),
-              Text(
-                warden['hostel']!,
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+              child: Column(
+                children: [
+
+                  ListTile(
+                    leading: const Icon(Icons.person, color: Colors.blue),
+                    title: const Text("Full Name"),
+                    subtitle: Text(fullname),
+                  ),
+
+                  const Divider(),
+
+                  ListTile(
+                    leading: const Icon(Icons.email, color: Colors.blue),
+                    title: const Text("Email"),
+                    subtitle: Text(email),
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
-              Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: ListTile(
-                  leading: const Icon(Icons.email, color: Colors.blue),
-                  title: Text(warden['email']!),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: ListTile(
-                  leading: const Icon(Icons.phone, color: Colors.blue),
-                  title: Text(warden['phone']!),
-                ),
-              ),
-              const SizedBox(height: 30),
-              ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Edit profile (stub)')));
+            ),
+
+            const Spacer(),
+
+            /// LOGOUT BUTTON
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+
+                  await FirebaseAuth.instance.signOut();
+
+                  Navigator.pushReplacementNamed(
+                    context,
+                    AppRoutes.login,
+                  );
                 },
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    minimumSize: const Size(double.infinity, 48)),
-                icon: const Icon(Icons.edit),
-                label: const Text("Edit Profile"),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pushReplacementNamed(context, AppRoutes.login);
-                },
-                style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    minimumSize: const Size(double.infinity, 48)),
                 icon: const Icon(Icons.logout),
                 label: const Text("Logout"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color.fromARGB(255, 242, 121, 91),
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
-            ],
-          ),
+            )
+          ],
         ),
       ),
+
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
@@ -126,8 +147,14 @@ class _WardenProfilePageState extends State<ProfilePage> {
         selectedItemColor: Colors.white,
         unselectedItemColor: Colors.white70,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: "Home",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: "Profile",
+          ),
         ],
       ),
     );

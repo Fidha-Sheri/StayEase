@@ -1,101 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../app_routes.dart';
 
-// import your pages
-import '../warden_home.dart';
-import 'profile_page.dart';
-
-class MessMenuPage extends StatefulWidget {
-  const MessMenuPage({super.key});
+class WardenMessMenuPage extends StatefulWidget {
+  const WardenMessMenuPage({super.key});
 
   @override
-  State<MessMenuPage> createState() => _WardenMessMenuPageState();
+  State<WardenMessMenuPage> createState() => _WardenMessMenuPageState();
 }
 
-class _WardenMessMenuPageState extends State<MessMenuPage> {
+class _WardenMessMenuPageState extends State<WardenMessMenuPage> {
   bool _loading = false;
-
-  final List<String> weekdays = [
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-    "Sunday"
-  ];
-
-  late List<Map<String, dynamic>> _weeklyMenu;
+  List<Map<String, dynamic>> _weeklyMenu = [];
+  int _selectedIndex = 1; // 0 = Home, 1 = Mess Menu
 
   @override
   void initState() {
     super.initState();
-    _weeklyMenu = weekdays.map((day) {
-      return {
-        'day': day,
-        'meals': [
-          {
-            'type': 'Breakfast',
-            'items': ['Idli', 'Sambar', 'Chutney']
-          },
-          {
-            'type': 'Lunch',
-            'items': ['Rice', 'Chicken Curry', 'Vegetables']
-          },
-          {
-            'type': 'Dinner',
-            'items': ['Chapati', 'Paneer Butter Masala', 'Salad']
-          },
-        ]
-      };
-    }).toList();
+    fetchMenu();
   }
 
-  Future<void> fetchMenuFromApi() async {
+  Future<void> fetchMenu() async {
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 700));
-    // TODO: replace with API call
+    final collection = FirebaseFirestore.instance.collection('mess_menu');
+
+    try {
+      final snapshot = await collection.get();
+
+      _weeklyMenu = snapshot.docs.map((doc) {
+        return {
+          'day': doc['day'],
+          'docId': doc.id,
+          'meals': List<Map<String, dynamic>>.from(doc['meals']),
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint("Error fetching menu: $e");
+    }
+
     setState(() => _loading = false);
   }
 
-  void editMealItems(Map<String, dynamic> meal) async {
-    final TextEditingController controller = TextEditingController(
-      text: meal['items'].join(', '),
-    );
-
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Edit ${meal['type']}'),
-        content: TextField(
-          controller: controller,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'Enter items separated by comma',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                meal['items'] =
-                    controller.text.split(',').map((e) => e.trim()).toList();
-              });
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget mealCard(Map<String, dynamic> meal) {
+  // 🔹 SAME MEAL CARD UI + EDIT BUTTON
+  Widget mealCard(String docId, Map<String, dynamic> meal, List meals) {
     IconData icon;
     Color color;
+
     switch (meal['type']) {
       case 'Breakfast':
         icon = Icons.breakfast_dining;
@@ -126,11 +76,11 @@ class _WardenMessMenuPageState extends State<MessMenuPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color,
               borderRadius: BorderRadius.circular(8),
             ),
-            padding: const EdgeInsets.all(8),
             child: Icon(icon, size: 28),
           ),
           const SizedBox(width: 12),
@@ -141,7 +91,7 @@ class _WardenMessMenuPageState extends State<MessMenuPage> {
                 Text(
                   meal['type'],
                   style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 18),
+                      fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -153,17 +103,17 @@ class _WardenMessMenuPageState extends State<MessMenuPage> {
           ),
           IconButton(
             icon: const Icon(Icons.edit, color: Colors.blue),
-            onPressed: () => editMealItems(meal),
+            onPressed: () => editMeal(docId, meal, meals),
           ),
         ],
       ),
     );
   }
 
+  // 🔹 DAY CARD
   Widget dayCard(Map<String, dynamic> day) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -172,45 +122,59 @@ class _WardenMessMenuPageState extends State<MessMenuPage> {
           children: [
             Text(
               day['day'],
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              style:
+                  const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            ...List.generate(day['meals'].length, (i) {
-              Map<String, dynamic> meal = day['meals'][i];
-              meal['day'] = day['day'];
-              return mealCard(meal);
-            }),
+            ...day['meals'].map<Widget>((meal) => mealCard(
+                  day['docId'],
+                  meal,
+                  day['meals'],
+                )),
           ],
         ),
       ),
     );
   }
 
-  int _selectedIndex = 1; // 0=Home, 1=MessMenu, 2=Profile
+  // 🔹 EDIT DIALOG
+  void editMeal(String docId, Map<String, dynamic> meal, List meals) {
+    final controller =
+        TextEditingController(text: meal['items'].join(', '));
 
-  void _onNavBarTap(int index) {
-    if (index == _selectedIndex) return;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Edit ${meal['type']}'),
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Comma separated items',
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              meal['items'] =
+                  controller.text.split(',').map((e) => e.trim()).toList();
 
-    setState(() {
-      _selectedIndex = index;
-    });
+              await FirebaseFirestore.instance
+                  .collection('mess_menu')
+                  .doc(docId)
+                  .update({'meals': meals});
 
-    if (index == 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const WardenHome()),
-      );
-    } else if (index == 1) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MessMenuPage()),
-      );
-    } else if (index == 2) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const ProfilePage()),
-      );
-    }
+              setState(() {});
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -219,31 +183,36 @@ class _WardenMessMenuPageState extends State<MessMenuPage> {
       appBar: AppBar(
         title: const Text('Warden Mess Menu'),
         centerTitle: true,
-        backgroundColor: Colors.blue.shade700,
+        backgroundColor: Colors.blue[800],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: fetchMenuFromApi,
+              onRefresh: fetchMenu,
               child: ListView.builder(
                 padding: const EdgeInsets.all(12),
                 itemCount: _weeklyMenu.length,
-                itemBuilder: (context, index) {
-                  final day = _weeklyMenu[index];
-                  return dayCard(day);
-                },
+                itemBuilder: (context, index) =>
+                    dayCard(_weeklyMenu[index]),
               ),
             ),
+      // -------- BOTTOM NAV (HOME & MESS MENU) --------
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: _onNavBarTap,
-        selectedItemColor: Colors.blue.shade700,
-        unselectedItemColor: Colors.grey,
+        onTap: (index) {
+          setState(() => _selectedIndex = index);
+
+          if (index == 0) {
+            Navigator.pushReplacementNamed(context, AppRoutes.homeWarden);
+          }
+        },
+        backgroundColor: Colors.blue[800],
+        selectedItemColor: const Color.fromARGB(255, 253, 253, 253),
+        unselectedItemColor: Colors.white60,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(
-              icon: Icon(Icons.restaurant_menu), label: 'Mess Menu'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+              icon: Icon(Icons.restaurant_menu), label: "Mess Menu"),
         ],
       ),
     );

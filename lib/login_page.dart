@@ -11,99 +11,127 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
 
-  bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
+  String? emailError;
+  String? passwordError;
+
+  /// 🔥 LOGIN FUNCTION
   Future<void> handleLogin() async {
+    setState(() {
+      emailError = null;
+      passwordError = null;
+    });
+
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Color(0xFF1E88E5),
-          content: Text(
-            'Please enter email and password',
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
-      );
+    if (email.isEmpty) {
+      setState(() => emailError = 'Please enter your email');
+      return;
+    }
+    if (password.isEmpty) {
+      setState(() => passwordError = 'Please enter your password');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      // 1️⃣ Sign in with Firebase Auth
       UserCredential userCredential =
           await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      final uid = userCredential.user!.uid;
-
-      // 2️⃣ Get user role from Firestore
-      DocumentSnapshot userDoc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .get();
 
       if (!userDoc.exists) {
-        throw FirebaseAuthException(
-          code: 'user-not-found',
-          message: 'User data not found in Firestore',
-        );
+        setState(() {
+          _isLoading = false;
+          emailError = 'User data not found';
+        });
+        return;
       }
 
-      String role = userDoc.get('role');
+      String role = userDoc['role'];
 
-      // 3️⃣ Navigate based on role
-      if (role.toLowerCase() == 'student') {
+      setState(() => _isLoading = false);
+
+      if (role == 'student') {
         Navigator.pushReplacementNamed(context, AppRoutes.homeStudent);
-      } else if (role.toLowerCase() == 'warden') {
+      } else if (role == 'warden') {
         Navigator.pushReplacementNamed(context, AppRoutes.homeWarden);
-      } else if (role.toLowerCase() == 'admin') {
+      } else if (role == 'admin') {
         Navigator.pushReplacementNamed(context, AppRoutes.homeAdmin);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Colors.red,
-            content: Text('Invalid user role'),
-          ),
-        );
+        setState(() => emailError = 'Invalid user role');
       }
     } on FirebaseAuthException catch (e) {
-      String error = 'Login failed';
-      if (e.code == 'user-not-found') error = 'No user found for this email';
-      if (e.code == 'wrong-password') error = 'Wrong password';
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.red,
-          content: Text(error, style: const TextStyle(color: Colors.white)),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.red,
-          content: Text('An error occurred: $e',
-              style: const TextStyle(color: Colors.white)),
-        ),
-      );
-    } finally {
       setState(() => _isLoading = false);
+
+      if (e.code == 'user-not-found') {
+        setState(() => emailError = 'No account found with this email');
+      } else if (e.code == 'wrong-password') {
+        setState(() => passwordError = 'Incorrect password');
+      } else {
+        setState(() => emailError = e.message ?? 'Login failed');
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        emailError = 'Something went wrong';
+      });
     }
   }
 
-  InputDecoration _inputDecoration(String hint, {Widget? suffix}) {
+  /// 🔐 FORGOT PASSWORD
+  Future<void> _forgotPassword() async {
+    final email = emailController.text.trim();
+
+    if (email.isEmpty) {
+      setState(() => emailError = 'Enter your email to reset password');
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password reset link sent to your email'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message ?? 'Failed to send reset email'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  InputDecoration _inputDecoration(
+    String hint, {
+    Widget? suffix,
+    String? error,
+  }) {
     return InputDecoration(
       hintText: hint,
       filled: true,
       fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      errorText: error,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: Color(0xFF90CAF9)),
@@ -179,17 +207,23 @@ class _LoginPageState extends State<LoginPage> {
                   style: TextStyle(color: Colors.grey),
                 ),
                 const SizedBox(height: 24),
+
+                /// Email
                 TextField(
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: _inputDecoration('Email'),
+                  decoration:
+                      _inputDecoration('Email', error: emailError),
                 ),
                 const SizedBox(height: 14),
+
+                /// Password
                 TextField(
                   controller: passwordController,
                   obscureText: _obscurePassword,
                   decoration: _inputDecoration(
                     'Password',
+                    error: passwordError,
                     suffix: IconButton(
                       icon: Icon(
                         _obscurePassword
@@ -197,19 +231,38 @@ class _LoginPageState extends State<LoginPage> {
                             : Icons.visibility,
                         color: Colors.grey,
                       ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                 ),
-                const SizedBox(height: 22),
+
+                /// 🔹 Forgot Password
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _forgotPassword,
+                    child: const Text(
+                      'Forgot Password?',
+                      style: TextStyle(
+                        color: Color(0xFF1E88E5),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                /// Login Button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : handleLogin,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF1976D2),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(22),
                       ),
@@ -233,14 +286,17 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                   ),
                 ),
+
                 const SizedBox(height: 12),
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text("Don't have an account? "),
                     TextButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, AppRoutes.register);
+                        Navigator.pushNamed(
+                            context, AppRoutes.register);
                       },
                       child: const Text('Sign up'),
                     )

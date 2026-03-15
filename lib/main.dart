@@ -4,7 +4,7 @@ import 'app_routes.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // <--- Required
+  await Firebase.initializeApp();
   runApp(const MyApp());
 }
 

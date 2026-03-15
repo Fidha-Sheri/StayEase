@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../admin_home.dart';
 import 'profile_page.dart';
 
@@ -10,94 +11,123 @@ class WardenManagementPage extends StatefulWidget {
 }
 
 class _WardenManagementPageState extends State<WardenManagementPage> {
-  List<Map<String, dynamic>> wardens = [
-    {"name": "John Doe", "email": "john@gmail.com", "gender": "Male"},
-    {"name": "Mary Jane", "email": "mary@gmail.com", "gender": "Female"},
-    {"name": "Robert Smith", "email": "robert@gmail.com", "gender": "Male"},
-    {"name": "Linda Brown", "email": "linda@gmail.com", "gender": "Female"},
-  ];
 
-  int _selectedIndex = 1; // 0 = Home, 1 = Wardens, 2 = Profile
+  int _selectedIndex = 1;
 
-  void _onNavTap(int index) {
-    if (index == _selectedIndex) return;
+  void _onNavTap(int index){
 
-    if (index == 0) {
+    if(index==0){
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const AdminHome()),
       );
-    } else if (index == 2) {
+    }
+
+    if(index==2){
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const ProfilePage()),
       );
     }
+  }
 
-    setState(() => _selectedIndex = index);
+  Future<void> deleteWarden(String id) async{
+    await FirebaseFirestore.instance
+        .collection("users")
+        .doc(id)
+        .delete();
   }
 
   @override
   Widget build(BuildContext context) {
+
     final primaryColor = Theme.of(context).primaryColor;
 
     return Scaffold(
+
       appBar: AppBar(
         title: const Text("Warden Management"),
         centerTitle: true,
         backgroundColor: primaryColor,
       ),
-      body: SingleChildScrollView(
-        scrollDirection: Axis.vertical,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columnSpacing: 30,
-            headingRowHeight: 40,
-            dataRowHeight: 45,
-            headingTextStyle: TextStyle(
-                fontSize: 14, fontWeight: FontWeight.bold, color: primaryColor),
-            dataTextStyle: const TextStyle(fontSize: 14),
-            columns: const [
-              DataColumn(label: Text('Name')),
-              DataColumn(label: Text('Email')),
-              DataColumn(label: Text('Gender')),
-              DataColumn(label: SizedBox()),
-            ],
-            rows: wardens.asMap().entries.map((entry) {
-              int index = entry.key;
-              Map<String, dynamic> warden = entry.value;
 
-              return DataRow(
-                cells: [
-                  DataCell(Text(warden["name"])),
-                  DataCell(Text(warden["email"])),
-                  DataCell(Text(warden["gender"])),
-                  DataCell(
-                    IconButton(
-                      icon: Icon(Icons.delete, color: primaryColor, size: 24),
-                      onPressed: () {
-                        setState(() {
-                          wardens.removeAt(index);
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
-          ),
-        ),
+      body: StreamBuilder(
+
+        stream: FirebaseFirestore.instance
+            .collection("users")
+            .where("role", isEqualTo: "warden")
+            .snapshots(),
+
+        builder: (context, snapshot){
+
+          if(!snapshot.hasData){
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          var wardens = snapshot.data!.docs;
+
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+
+              columns: const [
+
+                DataColumn(label: Text("Name")),
+                DataColumn(label: Text("Email")),
+                DataColumn(label: Text("Delete")),
+
+              ],
+
+              rows: wardens.map((doc){
+
+                return DataRow(
+
+                  cells: [
+
+                    DataCell(Text(doc['name'])),
+
+                    DataCell(Text(doc['email'])),
+
+                    DataCell(
+
+                      IconButton(
+
+                        icon: const Icon(Icons.delete,color: Colors.red),
+
+                        onPressed: (){
+                          deleteWarden(doc.id);
+                        },
+                      ),
+
+                    )
+
+                  ],
+                );
+
+              }).toList(),
+            ),
+          );
+
+        },
       ),
+
       bottomNavigationBar: BottomNavigationBar(
+
         currentIndex: _selectedIndex,
         onTap: _onNavTap,
-        selectedItemColor: primaryColor,
-        unselectedItemColor: Colors.grey,
+
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.group), label: "Wardens"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: "Home",
+          ),
+
+          BottomNavigationBarItem(
+            icon: Icon(Icons.group),
+            label: "Wardens",
+          ),
+
         ],
       ),
     );

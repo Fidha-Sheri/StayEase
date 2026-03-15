@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../student_home.dart';
 
 class ComplaintsPage extends StatefulWidget {
@@ -13,21 +15,12 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   bool _submitting = false;
+  int _selectedIndex = 1;
 
-  final List<Map<String, String>> _complaints = [
-    {
-      'title': 'Leaky Tap',
-      'status': 'Open',
-      'desc': 'Bathroom tap leaking since 2 days.'
-    },
-    {'title': 'Room Light', 'status': 'Resolved', 'desc': 'Light replaced.'},
-  ];
-
-  int _selectedIndex = 1; // 0 = Home, 1 = Complaints
+  final user = FirebaseAuth.instance.currentUser;
 
   void _onNavTap(int index) {
     if (index == _selectedIndex) return;
-
     if (index == 0) {
       Navigator.pushReplacement(
         context,
@@ -37,25 +30,33 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
   }
 
   Future<void> _submitComplaint() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || user == null) return;
 
     setState(() => _submitting = true);
-    await Future.delayed(const Duration(seconds: 1));
 
-    setState(() {
-      _submitting = false;
-      _complaints.insert(0, {
+    try {
+      await FirebaseFirestore.instance.collection('complaints').add({
+        'studentEmail': user!.email ?? 'No email',
+        'studentId': user!.uid,
         'title': _titleCtrl.text.trim(),
-        'status': 'Open',
-        'desc': _descCtrl.text.trim(),
+        'complaint': _descCtrl.text.trim(),
+        'resolved': false,
+        'created_at': FieldValue.serverTimestamp(),
       });
+
       _titleCtrl.clear();
       _descCtrl.clear();
-    });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Complaint submitted')),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Complaint submitted')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+
+    setState(() => _submitting = false);
   }
 
   @override
@@ -67,17 +68,23 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: Text("User not logged in")),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Complaints'),
         centerTitle: true,
-        backgroundColor: Colors.blue.shade700,
+        backgroundColor: Colors.blue[800],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Complaint Form
+            // ---------------- Complaint Form ----------------
             Card(
               elevation: 4,
               shape: RoundedRectangleBorder(
@@ -134,56 +141,100 @@ class _ComplaintsPageState extends State<ComplaintsPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
 
+            const SizedBox(height: 30),
+
+            // ---------------- Student Complaints List ----------------
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                _complaints.isEmpty ? 'No Complaints yet' : 'Your Complaints',
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                'Your Complaints',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade800),
               ),
             ),
             const SizedBox(height: 12),
 
-            // Complaints List
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _complaints.length,
-              itemBuilder: (_, i) {
-                final c = _complaints[i];
-                return Card(
-                  elevation: 2,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  child: ListTile(
-                    title: Text(
-                      c['title']!,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(c['desc']!),
-                    trailing: Chip(
-                      label: Text(c['status']!),
-                      backgroundColor: c['status'] == 'Resolved'
-                          ? Colors.green.shade100
-                          : Colors.red.shade100,
-                    ),
-                  ),
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('complaints')
+                  .where('studentId', isEqualTo: user!.uid)
+                  .orderBy('created_at', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Text(
+                    "No complaints submitted yet.",
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  );
+                }
+
+                final complaints = snapshot.data!.docs;
+
+                return ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: complaints.length,
+                  itemBuilder: (_, index) {
+                    final c = complaints[index];
+                    final data = c.data() as Map<String, dynamic>;
+                    final title = data['title'] ?? '';
+                    final complaint = data['complaint'] ?? '';
+                    final resolved = data['resolved'] ?? false;
+                    final createdAt = data['created_at'] != null
+                        ? (data['created_at'] as Timestamp).toDate()
+                        : null;
+
+                    return Card(
+                      elevation: 3,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      child: ListTile(
+                        title: Text(
+                          title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(complaint),
+                            const SizedBox(height: 6),
+                            Text(
+                              createdAt != null
+                                  ? 'Submitted on: ${createdAt.day}-${createdAt.month}-${createdAt.year}'
+                                  : '',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ],
+                        ),
+                        trailing: Chip(
+                          label: Text(resolved ? "Solved" : "Pending"),
+                          backgroundColor: resolved
+                              ? Colors.green.shade100
+                              : Colors.red.shade100,
+                        ),
+                      ),
+                    );
+                  },
                 );
               },
             ),
           ],
         ),
       ),
-
-      // 🔽 Bottom Navigation (ONLY 2 ITEMS)
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onNavTap,
-        selectedItemColor: Colors.blue.shade700,
-        unselectedItemColor: Colors.grey,
+        backgroundColor: Colors.blue[800],
+        selectedItemColor:  const Color.fromARGB(255, 244, 245, 248),
+        unselectedItemColor: Colors.white70,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),

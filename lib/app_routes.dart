@@ -16,7 +16,7 @@ import 'wardenscreens/profile_page.dart';
 // Admin Screens
 import 'adminscreens/student_management_page.dart';
 import 'adminscreens/warden_management_page.dart';
-import 'adminscreens/fee_management_page.dart';
+
 
 class AppRoutes {
   // Common
@@ -55,6 +55,5 @@ class AppRoutes {
     // Admin
     studentManagement: (context) => const StudentManagementPage(),
     wardenManagement: (context) => const WardenManagementPage(),
-    feeManagement: (context) => const FeeManagementPage(),
   };
 }
